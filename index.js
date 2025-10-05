@@ -1,11 +1,11 @@
-// index.js
 const puppeteer = require('puppeteer');
 const express = require('express');
 const fs = require('fs').promises;
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SESSION_FILE_PATH = './session.json';
+const SESSION_FILE_PATH = path.resolve(__dirname, 'session.json');
 
 let browser = null;
 let page = null;
@@ -29,7 +29,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Start server
+// Start server and initialize WhatsApp
 app.listen(PORT, () => {
   console.log(`🌐 Server listening on port ${PORT}`);
   initializeWhatsApp();
@@ -37,20 +37,20 @@ app.listen(PORT, () => {
 
 async function initializeWhatsApp() {
   try {
-    // Load session if available
     let session = null;
+
+    // Load session if exists
     try {
       const data = await fs.readFile(SESSION_FILE_PATH, 'utf8');
       session = JSON.parse(data);
       console.log('📂 Session file loaded');
     } catch {
-      console.log('📂 No session found. You need a pre-generated session for headless login.');
+      console.log('📂 No session found. Use a pre-generated session.json');
     }
 
-    console.log('🚀 Launching browser...');
+    console.log('🚀 Launching Puppeteer browser...');
     browser = await puppeteer.launch({
-      headless: true, // MUST be true on Render
-      executablePath: puppeteer.executablePath(), // Use bundled Chromium
+      headless: true, // Must be true for Render
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -65,8 +65,11 @@ async function initializeWhatsApp() {
     });
 
     page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
 
-    // Restore session if available
+    // Restore session cookies
     if (session && Array.isArray(session) && session.length > 0) {
       console.log('🔐 Restoring session cookies...');
       await page.setCookie(...session);
@@ -75,28 +78,21 @@ async function initializeWhatsApp() {
     console.log('🌐 Navigating to WhatsApp Web...');
     await page.goto('https://web.whatsapp.com', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // Check if session is valid
-    const chatSelector = '[data-testid="chat-list"]';
-    const qrSelector = 'canvas';
-    let selector = null;
+    // Check if logged in
+    const selector = await Promise.race([
+      page.waitForSelector('canvas', { timeout: 10000 }).then(() => 'qr'),
+      page.waitForSelector('[data-testid="chat-list"]', { timeout: 10000 }).then(() => 'chat')
+    ]).catch(() => null);
 
-    try {
-      selector = await Promise.race([
-        page.waitForSelector(chatSelector, { timeout: 15000 }).then(() => 'chat'),
-        page.waitForSelector(qrSelector, { timeout: 15000 }).then(() => 'qr')
-      ]);
-    } catch {}
-
-    if (selector === 'chat') {
+    if (selector === 'qr') {
+      throw new Error('📱 QR code detected! Cannot scan on headless server. Generate session locally.');
+    } else if (selector === 'chat') {
       console.log('✅ Session restored - logged in!');
-    } else if (selector === 'qr') {
-      console.log('📱 QR code detected! Headless server cannot scan QR, generate session locally first.');
-      throw new Error('Cannot scan QR code in headless server.');
     } else {
-      throw new Error('❌ Could not detect WhatsApp interface.');
+      throw new Error('❌ Could not detect QR or chat interface.');
     }
 
-    // Save session cookies
+    // Save session cookies (optional)
     const cookies = await page.cookies();
     await fs.writeFile(SESSION_FILE_PATH, JSON.stringify(cookies, null, 2));
     console.log('💾 Session saved to', SESSION_FILE_PATH);
@@ -105,18 +101,7 @@ async function initializeWhatsApp() {
     console.log('✅ WhatsApp Web is ready!');
 
     // Keep browser alive
-    setInterval(async () => {
-      if (page && !page.isClosed()) {
-        try {
-          await page.evaluate(() => document.title);
-          console.log('💓 Keep-alive ping');
-        } catch {
-          console.error('❌ Page closed, reinitializing...');
-          isReady = false;
-          initializeWhatsApp();
-        }
-      }
-    }, 60000);
+    keepAlive();
 
   } catch (err) {
     console.error('❌ Error initializing WhatsApp:', err.message);
@@ -126,13 +111,31 @@ async function initializeWhatsApp() {
   }
 }
 
+// Keep connection alive
+function keepAlive() {
+  setInterval(async () => {
+    if (page && !page.isClosed()) {
+      try {
+        await page.evaluate(() => document.title);
+        console.log('💓 Keep-alive ping');
+      } catch {
+        console.error('❌ Page closed, reinitializing...');
+        isReady = false;
+        initializeWhatsApp();
+      }
+    }
+  }, 60000);
+}
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
+  console.log('📴 Shutting down gracefully...');
   if (browser) await browser.close();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
+  console.log('📴 Shutting down gracefully...');
   if (browser) await browser.close();
   process.exit(0);
 });
