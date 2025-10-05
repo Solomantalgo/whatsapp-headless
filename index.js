@@ -45,17 +45,23 @@ async function initializeWhatsApp() {
       session = JSON.parse(data);
       console.log('📂 Session file loaded');
     } catch {
-      console.log('📂 No session file found, login required');
+      console.error('📂 No session file found. You must provide a valid session.json');
+      throw new Error('Session file missing in Docker container');
     }
 
     console.log('🚀 Launching Puppeteer...');
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
+        '--no-first-run',
+        '--no-zygote'
       ]
     });
 
@@ -70,19 +76,11 @@ async function initializeWhatsApp() {
     console.log('🌐 Navigating to WhatsApp Web...');
     await page.goto('https://web.whatsapp.com', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // Detect QR code or chat
-    const selector = await Promise.race([
-      page.waitForSelector('canvas', { timeout: 15000 }).then(() => 'qr'),
-      page.waitForSelector('[data-testid="chat-list"]', { timeout: 15000 }).then(() => 'chat')
-    ]).catch(() => null);
+    // Detect chat interface
+    const chatDetected = await page.waitForSelector('[data-testid="chat-list"]', { timeout: 30000 }).catch(() => null);
+    if (!chatDetected) throw new Error('❌ Could not detect chat interface. Session may be invalid.');
 
-    if (selector === 'qr') {
-      throw new Error('📱 QR code detected! Cannot scan in headless Docker.');
-    } else if (selector === 'chat') {
-      console.log('✅ Session restored - logged in!');
-    } else {
-      throw new Error('❌ Could not detect QR or chat interface.');
-    }
+    console.log('✅ Session restored - logged in!');
 
     // Save session cookies
     const cookies = await page.cookies();
