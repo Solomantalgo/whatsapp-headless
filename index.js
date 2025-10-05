@@ -47,8 +47,20 @@ async function initializeWhatsApp() {
     }
 
     console.log('🚀 Launching browser...');
+    
+    // Try to find Chrome executable
+    let executablePath;
+    try {
+      executablePath = puppeteer.executablePath();
+      console.log('📍 Chrome path:', executablePath);
+    } catch (err) {
+      console.log('⚠️  Could not auto-detect Chrome, using default path');
+      executablePath = '/opt/render/.cache/puppeteer/chrome/linux-141.0.7390.54/chrome-linux64/chrome';
+    }
+    
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -59,8 +71,7 @@ async function initializeWhatsApp() {
         '--disable-gpu',
         '--disable-software-rasterizer',
         '--disable-extensions'
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+      ]
     });
 
     page = await browser.newPage();
