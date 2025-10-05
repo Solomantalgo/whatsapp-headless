@@ -1,7 +1,7 @@
 services:
   - type: web
     name: whatsapp-headless
-    env: docker
+    env: node
     plan: free
-    dockerfilePath: ./Dockerfile
-    port: 3000
+    buildCommand: npm install && npx puppeteer browsers install chrome
+    startCommand: npm start
