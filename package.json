@@ -4,13 +4,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "setup": "node setup.js"
+    "setup": "node setup.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "express": "^5.1.0",
     "puppeteer": "^24.3.0"
-  },
-  "devDependencies": {
-    "qrcode-terminal": "^0.12.0"
   }
 }
