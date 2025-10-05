@@ -1,0 +1,4 @@
+node_modules/
+.DS_Store
+# Uncomment below if you want to keep session private
+# session.json
