@@ -48,19 +48,28 @@ async function initializeWhatsApp() {
 
     console.log('🚀 Launching browser...');
     
-    // Try to find Chrome executable
-    let executablePath;
+    // Install Chrome if not found
+    const { executablePath } = require('puppeteer');
+    let chromePath;
+    
     try {
-      executablePath = puppeteer.executablePath();
-      console.log('📍 Chrome path:', executablePath);
+      chromePath = executablePath();
+      console.log('📍 Chrome found at:', chromePath);
     } catch (err) {
-      console.log('⚠️  Could not auto-detect Chrome, using default path');
-      executablePath = '/opt/render/.cache/puppeteer/chrome/linux-141.0.7390.54/chrome-linux64/chrome';
+      console.log('⚠️  Chrome not found, installing...');
+      const { install } = require('@puppeteer/browsers');
+      await install({
+        browser: 'chrome',
+        buildId: '141.0.7390.54',
+        cacheDir: '/opt/render/.cache/puppeteer'
+      });
+      chromePath = executablePath();
+      console.log('✅ Chrome installed at:', chromePath);
     }
     
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: executablePath,
+      executablePath: chromePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
