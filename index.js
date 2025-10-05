@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const express = require('express');
 const fs = require('fs').promises;
 
@@ -15,8 +15,8 @@ app.get('/', (req, res) => {
   res.json({
     status: isReady ? 'ready' : 'initializing',
     message: isReady
-      ? '✅ WhatsApp headless bot is running!'
-      : '⏳ Bot is initializing...'
+      ? '✅ WhatsApp bot running!'
+      : '⏳ Bot initializing...'
   });
 });
 
@@ -28,6 +28,7 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`🌐 Server listening on port ${PORT}`);
   initializeWhatsApp();
@@ -35,25 +36,21 @@ app.listen(PORT, () => {
 
 async function initializeWhatsApp() {
   try {
-    // Load session if available
+    // Load saved session
     let session = null;
     try {
       const data = await fs.readFile(SESSION_FILE_PATH, 'utf8');
       session = JSON.parse(data);
       console.log('📂 Session file loaded');
     } catch {
-      console.log('📂 No session file found. Deploy with pre-generated session.json!');
+      console.log('📂 No session found, deploy with pre-generated session.json');
     }
 
-    console.log('🚀 Launching Puppeteer with system Chrome...');
+    console.log('🚀 Launching Puppeteer...');
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: '/usr/bin/google-chrome',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-      ]
+      executablePath: puppeteer.executablePath(), // Auto-detect Chromium
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     page = await browser.newPage();
@@ -69,21 +66,21 @@ async function initializeWhatsApp() {
       timeout: 60000
     });
 
-    // Detect QR or chat interface
+    // Check if QR code or chat interface
     const selector = await Promise.race([
       page.waitForSelector('canvas', { timeout: 10000 }).then(() => 'qr'),
       page.waitForSelector('[data-testid="chat-list"]', { timeout: 10000 }).then(() => 'chat')
     ]).catch(() => null);
 
     if (selector === 'qr') {
-      throw new Error('📱 QR code detected! Cannot scan on Render. Use pre-generated session.json.');
+      throw new Error('📱 QR code detected! Cannot scan in headless server.');
     } else if (selector === 'chat') {
       console.log('✅ Session restored - logged in!');
     } else {
       throw new Error('❌ Could not detect QR or chat interface.');
     }
 
-    // Save session cookies (optional)
+    // Save session cookies
     const cookies = await page.cookies();
     await fs.writeFile(SESSION_FILE_PATH, JSON.stringify(cookies, null, 2));
     console.log('💾 Session saved');
@@ -98,3 +95,4 @@ async function initializeWhatsApp() {
     setTimeout(initializeWhatsApp, 30000);
   }
 }
+

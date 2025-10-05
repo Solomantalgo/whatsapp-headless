@@ -3,5 +3,5 @@ services:
     name: whatsapp-headless
     env: node
     plan: free
-    buildCommand: npm ci
+    buildCommand: npm ci && npx -y puppeteer browsers install chrome
     startCommand: npm start
