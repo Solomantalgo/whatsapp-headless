@@ -86,7 +86,7 @@ console.log('================================\n');
 
     // Keep browser open for a few seconds
     console.log('Closing browser in 5 seconds...');
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 100000));
 
     await browser.close();
     console.log('👋 Done!');
