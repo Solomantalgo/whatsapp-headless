@@ -51,7 +51,12 @@ async function initializeWhatsApp() {
     console.log('🚀 Launching Puppeteer...');
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      executablePath: '/usr/bin/chromium', // Replit Chromium
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ]
     });
 
     page = await browser.newPage();
@@ -72,7 +77,7 @@ async function initializeWhatsApp() {
     ]).catch(() => null);
 
     if (selector === 'qr') {
-      throw new Error('📱 QR code detected! Scan manually in the web interface.');
+      console.error('📱 QR code detected! Scan manually in the web interface.');
     } else if (selector === 'chat') {
       console.log('✅ Session restored - logged in!');
     } else {
