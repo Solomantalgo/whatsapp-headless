@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "postinstall": "node install-chrome.js",
     "start": "node index.js"
   },
   "dependencies": {
